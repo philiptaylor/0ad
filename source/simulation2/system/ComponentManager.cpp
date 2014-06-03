@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Wildfire Games.
+/* Copyright (C) 2014 Wildfire Games.
  * This file is part of 0 A.D.
  *
  * 0 A.D. is free software: you can redistribute it and/or modify
@@ -50,6 +50,110 @@ public:
 	std::string handlerName;
 	std::string globalHandlerName;
 	CScriptValRooted msg;
+};
+
+/**
+ * A list of components that are dynamically subscribed to a particular
+ * message. The components list is sorted by (entity_id, ComponentTypeId),
+ * with no duplicates.
+ *
+ * To cope with changes to the subscription list while a message is still
+ * being broadcast, all changes are stored in the added/removed sets. The
+ * next time a message is sent, they will be merged into the main components
+ * list.
+ */
+class CComponentManager::CDynamicSubscription
+{
+	struct CompareIComponent
+	{
+		bool operator()(const IComponent* cmpA, const IComponent* cmpB)
+		{
+			entity_id_t entityA = cmpA->GetEntityId();
+			entity_id_t entityB = cmpB->GetEntityId();
+			if (entityA < entityB)
+				return true;
+			if (entityB < entityA)
+				return false;
+			int cidA = cmpA->GetComponentTypeId();
+			int cidB = cmpB->GetComponentTypeId();
+			if (cidA < cidB)
+				return true;
+			return false;
+		}
+	};
+public:
+	void Add(IComponent* cmp)
+	{
+		m_Removed.erase(cmp);
+		m_Added.insert(cmp);
+	}
+
+	void Remove(IComponent* cmp)
+	{
+		m_Added.erase(cmp);
+		m_Removed.insert(cmp);
+	}
+
+	void Flatten()
+	{
+		if (m_Added.empty() && m_Removed.empty())
+			return;
+
+		std::vector<IComponent*> tmp;
+		tmp.reserve(m_Components.size() + m_Added.size());
+
+		// tmp = m_Components - m_Removed
+		std::set_difference(
+				m_Components.begin(), m_Components.end(),
+				m_Removed.begin(), m_Removed.end(),
+				std::back_inserter(tmp),
+				CompareIComponent());
+
+		m_Components.clear();
+
+		// m_Components = tmp + m_Added
+		std::set_union(
+				tmp.begin(), tmp.end(),
+				m_Added.begin(), m_Added.end(),
+				std::back_inserter(m_Components),
+				CompareIComponent());
+
+		m_Added.clear();
+		m_Removed.clear();
+	}
+
+	const std::vector<IComponent*>& GetComponents()
+	{
+		// Must be flattened before calling this function
+		ENSURE(m_Added.empty() && m_Removed.empty());
+
+		return m_Components;
+	}
+
+	void DebugDump()
+	{
+		std::set<IComponent*, CompareIComponent>::iterator it;
+
+		debug_printf(L"components:");
+		for (size_t i = 0; i < m_Components.size(); i++)
+			debug_printf(L" %p", m_Components[i]);
+		debug_printf(L"\n");
+
+		debug_printf(L"added:");
+		for (it = m_Added.begin(); it != m_Added.end(); ++it)
+			debug_printf(L" %p", *it);
+		debug_printf(L"\n");
+
+		debug_printf(L"removed:");
+		for (it = m_Removed.begin(); it != m_Removed.end(); ++it)
+			debug_printf(L" %p", *it);
+		debug_printf(L"\n");
+	}
+
+private:
+	std::vector<IComponent*> m_Components; // always in CompareIComponent order
+	std::set<IComponent*, CompareIComponent> m_Added;
+	std::set<IComponent*, CompareIComponent> m_Removed;
 };
 
 CComponentManager::CComponentManager(CSimContext& context, shared_ptr<ScriptRuntime> rt, bool skipScriptFunctions) :
@@ -567,6 +671,50 @@ void CComponentManager::SubscribeGloballyToMessageType(MessageTypeId mtid)
 	std::sort(types.begin(), types.end()); // TODO: just sort once at the end of LoadComponents
 }
 
+void CComponentManager::FlattenDynamicSubscriptions()
+{
+	std::map<MessageTypeId, CDynamicSubscription>::iterator it;
+	for (it = m_DynamicMessageSubscriptionsNonsync.begin();
+	     it != m_DynamicMessageSubscriptionsNonsync.end(); ++it)
+	{
+		it->second.Flatten();
+	}
+}
+
+void CComponentManager::DynamicSubscriptionNonsync(MessageTypeId mtid, IComponent* component, bool enable)
+{
+	if (enable)
+	{
+		bool newlyInserted = m_DynamicMessageSubscriptionsNonsyncByComponent[component].insert(mtid).second;
+		if (newlyInserted)
+			m_DynamicMessageSubscriptionsNonsync[mtid].Add(component);
+	}
+	else
+	{
+		size_t numRemoved = m_DynamicMessageSubscriptionsNonsyncByComponent[component].erase(mtid);
+		if (numRemoved)
+			m_DynamicMessageSubscriptionsNonsync[mtid].Remove(component);
+	}
+}
+
+void CComponentManager::RemoveComponentDynamicSubscriptions(IComponent* component)
+{
+	std::map<IComponent*, std::set<MessageTypeId> >::iterator it = m_DynamicMessageSubscriptionsNonsyncByComponent.find(component);
+	if (it == m_DynamicMessageSubscriptionsNonsyncByComponent.end())
+		return;
+
+	std::set<MessageTypeId>::iterator mtit;
+	for (mtit = it->second.begin(); mtit != it->second.end(); ++mtit)
+	{
+		m_DynamicMessageSubscriptionsNonsync[*mtit].Remove(component);
+
+		// Need to flatten the subscription lists immediately to avoid dangling IComponent* references
+		m_DynamicMessageSubscriptionsNonsync[*mtit].Flatten();
+	}
+
+	m_DynamicMessageSubscriptionsNonsyncByComponent.erase(it);
+}
+
 CComponentManager::ComponentTypeId CComponentManager::LookupCID(const std::string& cname) const
 {
 	std::map<std::string, ComponentTypeId>::const_iterator it = m_ComponentTypeIdsByName.find(cname);
@@ -830,6 +978,10 @@ void CComponentManager::FlushDestroyedComponents()
 		std::vector<entity_id_t> queue;
 		queue.swap(m_DestructionQueue);
 
+		// Flatten all the dynamic subscriptions to ensure there are no dangling
+		// references in the 'removed' lists to components we're going to delete
+		FlattenDynamicSubscriptions();
+
 		for (std::vector<entity_id_t>::iterator it = queue.begin(); it != queue.end(); ++it)
 		{
 			entity_id_t ent = *it;
@@ -846,6 +998,7 @@ void CComponentManager::FlushDestroyedComponents()
 				if (eit != iit->second.end())
 				{
 					eit->second->Deinit();
+					RemoveComponentDynamicSubscriptions(eit->second);
 					m_ComponentTypesById[iit->first].dealloc(eit->second);
 					iit->second.erase(ent);
 					handle.GetComponentCache()->interfaces[m_ComponentTypesById[iit->first].iid] = NULL;
@@ -916,7 +1069,7 @@ const CComponentManager::InterfaceListUnordered& CComponentManager::GetEntitiesW
 	return m_ComponentsByInterface[iid];
 }
 
-void CComponentManager::PostMessage(entity_id_t ent, const CMessage& msg) const
+void CComponentManager::PostMessage(entity_id_t ent, const CMessage& msg)
 {
 	// Send the message to components of ent, that subscribed locally to this message
 	std::map<MessageTypeId, std::vector<ComponentTypeId> >::const_iterator it;
@@ -941,7 +1094,7 @@ void CComponentManager::PostMessage(entity_id_t ent, const CMessage& msg) const
 	SendGlobalMessage(ent, msg);
 }
 
-void CComponentManager::BroadcastMessage(const CMessage& msg) const
+void CComponentManager::BroadcastMessage(const CMessage& msg)
 {
 	// Send the message to components of all entities that subscribed locally to this message
 	std::map<MessageTypeId, std::vector<ComponentTypeId> >::const_iterator it;
@@ -966,11 +1119,11 @@ void CComponentManager::BroadcastMessage(const CMessage& msg) const
 	SendGlobalMessage(INVALID_ENTITY, msg);
 }
 
-void CComponentManager::SendGlobalMessage(entity_id_t ent, const CMessage& msg) const
+void CComponentManager::SendGlobalMessage(entity_id_t ent, const CMessage& msg)
 {
 	// (Common functionality for PostMessage and BroadcastMessage)
 
-	// Send the message to components of all entities that subscribed globally to this message
+	// Send the message to components of all component types that subscribed globally to this message
 	std::map<MessageTypeId, std::vector<ComponentTypeId> >::const_iterator it;
 	it = m_GlobalMessageSubscriptions.find(msg.GetType());
 	if (it != m_GlobalMessageSubscriptions.end())
@@ -999,8 +1152,18 @@ void CComponentManager::SendGlobalMessage(entity_id_t ent, const CMessage& msg) 
 				eit->second->HandleMessage(msg, true);
 		}
 	}
-}
 
+	// Send the message to component instances that dynamically subscribed to this message
+	std::map<MessageTypeId, CDynamicSubscription>::iterator dit = m_DynamicMessageSubscriptionsNonsync.find(msg.GetType());
+	if (dit != m_DynamicMessageSubscriptionsNonsync.end())
+	{
+		dit->second.Flatten();
+		const std::vector<IComponent*>& dynamic = dit->second.GetComponents();
+		for (size_t i = 0; i < dynamic.size(); i++)
+			dynamic[i]->HandleMessage(msg, false);
+	}
+	// XXX: sort out global, broadcast, etc
+}
 
 std::string CComponentManager::GenerateSchema()
 {

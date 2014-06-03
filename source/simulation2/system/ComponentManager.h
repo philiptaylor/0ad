@@ -72,10 +72,13 @@ private:
 		CScriptValRooted ctor; // only valid if type == CT_Script
 	};
 	
-	struct FindJSONFilesCallbackData {
+	struct FindJSONFilesCallbackData
+	{
 		VfsPath path;
 		std::vector<std::string> templates;
 	};
+
+	class CDynamicSubscription;
 
 public:
 	CComponentManager(CSimContext&, shared_ptr<ScriptRuntime> rt, bool skipScriptFunctions = false);
@@ -113,6 +116,12 @@ public:
 	 * Must only be called by a component type's ClassInit.
 	 */
 	void SubscribeGloballyToMessageType(MessageTypeId mtid);
+
+	/**
+	 * Subscribe the current component instance to the given message type.
+	 * XXX
+	 */
+	void DynamicSubscriptionNonsync(MessageTypeId mtid, IComponent* component, bool enabled);
 
 	/**
 	 * @param cname Requested component type name (not including any "CID" or "CCmp" prefix)
@@ -221,13 +230,13 @@ public:
 	 * components of that entity which subscribed to the message type, and by any other components
 	 * that subscribed globally to the message type.
 	 */
-	void PostMessage(entity_id_t ent, const CMessage& msg) const;
+	void PostMessage(entity_id_t ent, const CMessage& msg);
 
 	/**
 	 * Send a message, not targeted at any particular entity. The message will be received by any
 	 * components that subscribed (either globally or not) to the message type.
 	 */
-	void BroadcastMessage(const CMessage& msg) const;
+	void BroadcastMessage(const CMessage& msg);
 
 	/**
 	 * Resets the dynamic simulation state (deletes all entities, resets entity ID counters;
@@ -273,7 +282,10 @@ private:
 	static Status FindJSONFilesCallback(const VfsPath&, const CFileInfo&, const uintptr_t);
 
 	CMessage* ConstructMessage(int mtid, CScriptVal data);
-	void SendGlobalMessage(entity_id_t ent, const CMessage& msg) const;
+	void SendGlobalMessage(entity_id_t ent, const CMessage& msg);
+
+	void FlattenDynamicSubscriptions();
+	void RemoveComponentDynamicSubscriptions(IComponent* component);
 
 	ComponentTypeId GetScriptWrapper(InterfaceId iid);
 
@@ -298,6 +310,9 @@ private:
 	std::map<std::string, MessageTypeId> m_MessageTypeIdsByName;
 	std::map<MessageTypeId, std::string> m_MessageTypeNamesById;
 	std::map<std::string, InterfaceId> m_InterfaceIdsByName;
+
+	std::map<MessageTypeId, CDynamicSubscription> m_DynamicMessageSubscriptionsNonsync;
+	std::map<IComponent*, std::set<MessageTypeId> > m_DynamicMessageSubscriptionsNonsyncByComponent;
 
 	std::map<entity_id_t, SEntityComponentCache*> m_ComponentCaches;
 
