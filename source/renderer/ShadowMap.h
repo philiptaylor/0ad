@@ -94,7 +94,9 @@ public:
 	 *
 	 * @param bounds world space bounding box
 	 */
-	void AddShadowedBound(const CBoundingBoxAligned& bounds);
+	void AddShadowCasterBound(const CBoundingBoxAligned& bounds);
+
+	void AddShadowReceiverBound(const CBoundingBoxAligned& bounds);
 
 	/**
 	 * BeginRender: Set OpenGL state for rendering into the shadow map texture.
@@ -136,6 +138,8 @@ public:
 	 * Visualize shadow map texture to help in debugging.
 	 */
 	void RenderDebugTexture();
+
+	CFrustum GetShadowCasterCullFrustum();
 
 private:
 	ShadowMapInternals* m;

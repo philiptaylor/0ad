@@ -350,6 +350,8 @@ void CCmpUnitRenderer::RenderSubmit(SceneCollector& collector, const CFrustum& f
 		if (!cmpPosition)
 			continue;
 
+		// XXX: avoid recomputing multiple times per frame, for multiple cull groups
+
 		CMatrix3D transform(cmpPosition->GetInterpolatedTransform(m_FrameOffset));
 
 		CModelAbstract& unitModel = unit.actor->GetModel();
