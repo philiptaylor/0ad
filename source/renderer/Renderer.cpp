@@ -65,6 +65,7 @@
 #include "renderer/ParticleRenderer.h"
 #include "renderer/RenderModifiers.h"
 #include "renderer/ShadowMap.h"
+#include "renderer/SilhouetteRenderer.h"
 #include "renderer/SkyManager.h"
 #include "renderer/TerrainOverlay.h"
 #include "renderer/TerrainRenderer.h"
@@ -292,6 +293,8 @@ public:
 	CPostprocManager postprocManager;
 
 	CFontManager fontManager;
+
+	SilhouetteRenderer silhouetteRenderer;
 
 	/// Various model renderers
 	struct Models
@@ -1305,7 +1308,6 @@ SScreenRect CRenderer::RenderRefractions(const CShaderDefines& context, const CB
 	return screenScissor;
 }
 
-
 void CRenderer::RenderSilhouettes(const CShaderDefines& context)
 {
 	PROFILE3_GPU("silhouettes");
@@ -1332,7 +1334,7 @@ void CRenderer::RenderSilhouettes(const CShaderDefines& context)
 
 	glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-	glColorMask(0, 0, 0, 0);
+	//glColorMask(0, 0, 0, 0);
 
 	// Render occluders:
 
@@ -1343,21 +1345,22 @@ void CRenderer::RenderSilhouettes(const CShaderDefines& context)
 		// protrude into the ground, only occlude with the back faces of the
 		// terrain (so silhouettes will still display when behind hills)
 		glCullFace(GL_FRONT);
-		m->terrainRenderer.RenderPatches(CULL_DEFAULT);
+		m->terrainRenderer.RenderPatches(CULL_SILHOUETTE_OCCLUDER);
 		glCullFace(GL_BACK);
 	}
 
 	{
 		PROFILE("render model occluders");
-		m->CallModelRenderers(contextOccluder, CULL_DEFAULT, MODELFLAG_SILHOUETTE_OCCLUDER);
+		m->CallModelRenderers(contextOccluder, CULL_SILHOUETTE_OCCLUDER, 0);
 	}
 
 	{
 		PROFILE("render transparent occluders");
-		m->CallTranspModelRenderers(contextOccluder, CULL_DEFAULT, MODELFLAG_SILHOUETTE_OCCLUDER);
+		m->CallTranspModelRenderers(contextOccluder, CULL_SILHOUETTE_OCCLUDER, 0);
 	}
 
-	glDepthFunc(GL_GEQUAL);
+	//glDepthFunc(GL_GEQUAL);
+	glDepthFunc(GL_LEQUAL);
 	glColorMask(1, 1, 1, 1);
 
 	// Render more efficiently if alpha == 1
@@ -1377,18 +1380,14 @@ void CRenderer::RenderSilhouettes(const CShaderDefines& context)
 		glBlendFunc(GL_CONSTANT_ALPHA, GL_ONE_MINUS_CONSTANT_ALPHA);
 		pglBlendColorEXT(0, 0, 0, silhouetteAlpha);
 
-		glEnable(GL_STENCIL_TEST);
+		//glEnable(GL_STENCIL_TEST);
 		glStencilFunc(GL_NOTEQUAL, 1, (GLuint)-1);
 		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 	}
 
-	// TODO: For performance, we probably ought to do a quick raycasting check
-	// to see which units are likely blocked by occluders and not bother
-	// rendering any of the others
-
 	{
 		PROFILE("render models");
-		m->CallModelRenderers(contextDisplay, CULL_DEFAULT, MODELFLAG_SILHOUETTE_DISPLAY);
+		m->CallModelRenderers(contextDisplay, CULL_SILHOUETTE_DISPLAY, 0);
 		// (This won't render transparent objects with SILHOUETTE_DISPLAY - will
 		// we have any units that need that?)
 	}
@@ -1611,6 +1610,8 @@ void CRenderer::RenderSubmissions(const CBoundingBoxAligned& waterScissor)
 		ogl_WarnIfError();
 	}
 
+	m->silhouetteRenderer.RenderDebugOverlays(m_ViewCamera);
+
 	// render overlays that should appear on top of all other objects
 	m->overlayRenderer.RenderForegroundOverlays(m_ViewCamera);
 	ogl_WarnIfError();
@@ -1627,6 +1628,7 @@ void CRenderer::EndFrame()
 	m->terrainRenderer.EndFrame();
 	m->overlayRenderer.EndFrame();
 	m->particleRenderer.EndFrame();
+	m->silhouetteRenderer.EndFrame();
 
 	// Finish model renderers
 	m->Model.NormalSkinned->EndFrame();
@@ -1717,10 +1719,14 @@ SViewPort CRenderer::GetViewport()
 void CRenderer::Submit(CPatch* patch)
 {
 	if (m_CurrentCullGroup == CULL_DEFAULT)
+	{
 		m->shadow.AddShadowReceiverBound(patch->GetWorldBounds());
+		m->silhouetteRenderer.AddOccluder(patch);
+	}
 
 	if (m_CurrentCullGroup == CULL_SHADOWS)
 		m->shadow.AddShadowCasterBound(patch->GetWorldBounds());
+
 
 	m->terrainRenderer.Submit(m_CurrentCullGroup, patch);
 }
@@ -1777,6 +1783,11 @@ void CRenderer::SubmitNonRecursive(CModel* model)
 	if (m_CurrentCullGroup == CULL_DEFAULT)
 	{
 		m->shadow.AddShadowReceiverBound(model->GetWorldBounds());
+
+		if (model->GetFlags() & MODELFLAG_SILHOUETTE_OCCLUDER)
+			m->silhouetteRenderer.AddOccluder(model);
+		if (model->GetFlags() & MODELFLAG_SILHOUETTE_DISPLAY)
+			m->silhouetteRenderer.AddDisplayer(model);
 	}
 
 	if (m_CurrentCullGroup == CULL_SHADOWS)
@@ -1819,6 +1830,17 @@ void CRenderer::RenderScene(Scene& scene)
 	scene.EnumerateObjects(frustum, this);
 
 	m->particleManager.RenderSubmit(*this, frustum);
+
+	if (m_Options.m_Silhouettes)
+	{
+		m->silhouetteRenderer.ComputeSubmissions(m_ViewCamera);
+
+		m_CurrentCullGroup = CULL_SILHOUETTE_OCCLUDER;
+		m->silhouetteRenderer.RenderSubmitOccluders(*this);
+
+		m_CurrentCullGroup = CULL_SILHOUETTE_DISPLAY;
+		m->silhouetteRenderer.RenderSubmitDisplayers(*this);
+	}
 
 	if (m_Caps.m_Shadows && m_Options.m_Shadows && GetRenderPath() == RP_SHADER)
 	{
