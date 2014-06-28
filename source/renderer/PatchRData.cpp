@@ -370,34 +370,40 @@ void CPatchRData::AddBlend(std::vector<SBlendVertex>& blendVertices, std::vector
 
 	size_t index = blendVertices.size();
 
+	float f;
+
 	terrain->CalcPosition(gx, gz, dst.m_Position);
 	terrain->CalcNormal(gx, gz, normal);
+	f =  terrain->CalcAmbientFactor(gx, gz);
 	dst.m_Normal = normal;
-	dst.m_DiffuseColor = cpuLighting ? lightEnv.EvaluateTerrainDiffuseScaled(normal) : lightEnv.EvaluateTerrainDiffuseFactor(normal);
+	dst.m_DiffuseColor = cpuLighting ? lightEnv.EvaluateTerrainDiffuseScaled(normal) : lightEnv.EvaluateTerrainDiffuseFactor(normal * f);
 	dst.m_AlphaUVs[0] = vtx[0].m_AlphaUVs[0];
 	dst.m_AlphaUVs[1] = vtx[0].m_AlphaUVs[1];
 	blendVertices.push_back(dst);
 
 	terrain->CalcPosition(gx + 1, gz, dst.m_Position);
 	terrain->CalcNormal(gx + 1, gz, normal);
+	f =  terrain->CalcAmbientFactor(gx + 1, gz);
 	dst.m_Normal = normal;
-	dst.m_DiffuseColor = cpuLighting ? lightEnv.EvaluateTerrainDiffuseScaled(normal) : lightEnv.EvaluateTerrainDiffuseFactor(normal);
+	dst.m_DiffuseColor = cpuLighting ? lightEnv.EvaluateTerrainDiffuseScaled(normal) : lightEnv.EvaluateTerrainDiffuseFactor(normal * f);
 	dst.m_AlphaUVs[0] = vtx[1].m_AlphaUVs[0];
 	dst.m_AlphaUVs[1] = vtx[1].m_AlphaUVs[1];
 	blendVertices.push_back(dst);
 
 	terrain->CalcPosition(gx + 1, gz + 1, dst.m_Position);
 	terrain->CalcNormal(gx + 1, gz + 1, normal);
+	f =  terrain->CalcAmbientFactor(gx + 1, gz + 1);
 	dst.m_Normal = normal;
-	dst.m_DiffuseColor = cpuLighting ? lightEnv.EvaluateTerrainDiffuseScaled(normal) : lightEnv.EvaluateTerrainDiffuseFactor(normal);
+	dst.m_DiffuseColor = cpuLighting ? lightEnv.EvaluateTerrainDiffuseScaled(normal) : lightEnv.EvaluateTerrainDiffuseFactor(normal * f);
 	dst.m_AlphaUVs[0] = vtx[2].m_AlphaUVs[0];
 	dst.m_AlphaUVs[1] = vtx[2].m_AlphaUVs[1];
 	blendVertices.push_back(dst);
 
 	terrain->CalcPosition(gx, gz + 1, dst.m_Position);
 	terrain->CalcNormal(gx, gz + 1, normal);
+	f =  terrain->CalcAmbientFactor(gx, gz + 1);
 	dst.m_Normal = normal;
-	dst.m_DiffuseColor = cpuLighting ? lightEnv.EvaluateTerrainDiffuseScaled(normal) : lightEnv.EvaluateTerrainDiffuseFactor(normal);
+	dst.m_DiffuseColor = cpuLighting ? lightEnv.EvaluateTerrainDiffuseScaled(normal) : lightEnv.EvaluateTerrainDiffuseFactor(normal * f);
 	dst.m_AlphaUVs[0] = vtx[3].m_AlphaUVs[0];
 	dst.m_AlphaUVs[1] = vtx[3].m_AlphaUVs[1];
 	blendVertices.push_back(dst);
@@ -556,9 +562,11 @@ void CPatchRData::BuildVertices()
 			CVector3D normal;
 			terrain->CalcNormal(ix,iz,normal);
 			
+			float f = terrain->CalcAmbientFactor(ix, iz);
+
 			vertices[v].m_Normal = normal;
 
-			vertices[v].m_DiffuseColor = cpuLighting ? lightEnv.EvaluateTerrainDiffuseScaled(normal) : lightEnv.EvaluateTerrainDiffuseFactor(normal);
+			vertices[v].m_DiffuseColor = cpuLighting ? lightEnv.EvaluateTerrainDiffuseScaled(normal) : lightEnv.EvaluateTerrainDiffuseFactor(normal * f);
 		}
 	}
 

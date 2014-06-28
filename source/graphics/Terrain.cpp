@@ -277,6 +277,50 @@ CVector3D CTerrain::CalcExactNormal(float x, float z) const
 	}
 }
 
+float CTerrain::GetHorizonAngle(ssize_t i, ssize_t j, ssize_t di, ssize_t dj) const
+{
+	ssize_t i0 = i;
+	ssize_t j0 = j;
+	float d = 1;
+	u16 h0 = m_Heightmap[j*m_MapSize + i];
+
+	i += di;
+	j += dj;
+
+	float maxTan = 0;
+
+	while (i >= 0 && j >= 0 && i < m_MapSize && j < m_MapSize)
+	{
+		u16 h = m_Heightmap[j*m_MapSize + i];
+		float t = (float)((int)h - (int)h0) / (float)d;
+
+		maxTan = std::max(maxTan, t);
+
+		i += di;
+		j += dj;
+		d++;
+//		if (d > 10)
+//			break;
+	}
+
+	maxTan *= HEIGHT_SCALE / (TERRAIN_TILE_SIZE * sqrtf(di*di + dj*dj));
+	return M_PI/2 - atan(maxTan);
+}
+
+float CTerrain::CalcAmbientFactor(ssize_t i, ssize_t j) const
+{
+	float a = 0;
+	a += GetHorizonAngle(i, j, 1, 0);
+	a += GetHorizonAngle(i, j, 1, 1);
+	a += GetHorizonAngle(i, j, 0, 1);
+	a += GetHorizonAngle(i, j, -1, 1);
+	a += GetHorizonAngle(i, j, -1, 0);
+	a += GetHorizonAngle(i, j, -1, -1);
+	a += GetHorizonAngle(i, j, 0, -1);
+	a += GetHorizonAngle(i, j, 1, -1);
+	return a / (M_PI/2) / 8;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // GetPatch: return the patch at (i,j) in patch space, or null if the patch is
 // out of bounds

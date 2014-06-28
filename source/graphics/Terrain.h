@@ -130,6 +130,9 @@ public:
 
 	CVector3D CalcExactNormal(float x, float z) const;
 
+	float CalcAmbientFactor(ssize_t i, ssize_t j) const;
+	float GetHorizonAngle(ssize_t i, ssize_t j, ssize_t di, ssize_t dj) const;
+
 	// Mark a specific square of tiles (inclusive lower bound, exclusive upper bound)
 	// as dirty - use this after modifying the heightmap.
 	// If you modify a vertex (i,j), you should dirty tiles
