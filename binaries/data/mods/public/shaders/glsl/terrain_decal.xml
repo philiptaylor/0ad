@@ -10,6 +10,7 @@
         <attrib name="a_vertex" semantics="gl_Vertex"/>
         <attrib name="a_color" semantics="gl_Color"/>
         <attrib name="a_uv0" semantics="gl_MultiTexCoord0"/>
+        <attrib name="a_ao" semantics="CustomAttribute0"/>
     </vertex>
 
     <fragment file="glsl/terrain_common.fs"/>

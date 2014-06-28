@@ -570,6 +570,7 @@ size_t CShaderManager::GetNumEffectsLoaded()
 
 Status CShaderManager::ReloadChangedFile(const VfsPath& path)
 {
+	debug_printf(L"%ls\n", path.string().c_str());
 	// Find all shaders using this file
 	HotloadFilesMap::iterator files = m_HotloadFiles.find(path);
 	if (files != m_HotloadFiles.end())
@@ -577,6 +578,7 @@ Status CShaderManager::ReloadChangedFile(const VfsPath& path)
 		// Reload all shaders using this file
 		for (std::set<boost::weak_ptr<CShaderProgram> >::iterator it = files->second.begin(); it != files->second.end(); ++it)
 		{
+			debug_printf(L"reload\n");
 			if (shared_ptr<CShaderProgram> program = it->lock())
 				program->Reload();
 		}

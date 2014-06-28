@@ -40,7 +40,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // CTerrain constructor
 CTerrain::CTerrain()
-: m_Heightmap(0), m_Patches(0), m_MapSize(0), m_MapSizePatches(0),
+: m_Heightmap(NULL), m_Patches(NULL), m_AO(NULL), m_MapSize(0), m_MapSizePatches(0),
 m_BaseColour(255, 255, 255, 255)
 {
 }
@@ -61,6 +61,7 @@ void CTerrain::ReleaseData()
 
 	delete[] m_Heightmap;
 	delete[] m_Patches;
+	delete[] m_AO;
 }
 
 
@@ -78,6 +79,7 @@ bool CTerrain::Initialize(ssize_t patchesPerSide, const u16* data)
 	// allocate data for new terrain
 	m_Heightmap = new u16[m_MapSize*m_MapSize];
 	m_Patches = new CPatch[m_MapSizePatches*m_MapSizePatches];
+	m_AO = new float[m_MapSize*m_MapSize];
 
 	// given a heightmap?
 	if (data)
@@ -97,7 +99,18 @@ bool CTerrain::Initialize(ssize_t patchesPerSide, const u16* data)
 	// initialise mipmap
 	m_HeightMipmap.Initialize(m_MapSize, m_Heightmap);
 
+	InitialiseAO();
+
 	return true;
+}
+
+void CTerrain::InitialiseAO()
+{
+	memset(m_AO, 0, m_MapSize*m_MapSize*sizeof(float));
+
+	for (ssize_t j = 0; j < m_MapSize; ++j)
+		for (ssize_t i = 0; i < m_MapSize; ++i)
+			m_AO[i + j*m_MapSize] = CalcAmbientFactor(i, j);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -279,6 +292,7 @@ CVector3D CTerrain::CalcExactNormal(float x, float z) const
 
 float CTerrain::GetHorizonAngle(ssize_t i, ssize_t j, ssize_t di, ssize_t dj) const
 {
+	// XXX do nothings.org/gamedev/horizon/
 	ssize_t i0 = i;
 	ssize_t j0 = j;
 	float d = 1;
@@ -304,11 +318,16 @@ float CTerrain::GetHorizonAngle(ssize_t i, ssize_t j, ssize_t di, ssize_t dj) co
 	}
 
 	maxTan *= HEIGHT_SCALE / (TERRAIN_TILE_SIZE * sqrtf(di*di + dj*dj));
-	return M_PI/2 - atan(maxTan);
+	float c = (M_PI/2 - atan(maxTan)) / (M_PI/2);
+	return c*c;
 }
+
+bool g_disable_ao = false;
 
 float CTerrain::CalcAmbientFactor(ssize_t i, ssize_t j) const
 {
+	if (g_disable_ao)
+		return 1;
 	float a = 0;
 	a += GetHorizonAngle(i, j, 1, 0);
 	a += GetHorizonAngle(i, j, 1, 1);
@@ -318,7 +337,7 @@ float CTerrain::CalcAmbientFactor(ssize_t i, ssize_t j) const
 	a += GetHorizonAngle(i, j, -1, -1);
 	a += GetHorizonAngle(i, j, 0, -1);
 	a += GetHorizonAngle(i, j, 1, -1);
-	return a / (M_PI/2) / 8;
+	return a / 8;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -634,6 +653,8 @@ void CTerrain::SetHeightMap(u16* heightmap)
 
 	// update mipmap
 	m_HeightMipmap.Update(m_Heightmap);
+
+	InitialiseAO();
 }
 
 
@@ -667,6 +688,8 @@ void CTerrain::MakeDirty(ssize_t i0, ssize_t j0, ssize_t i1, ssize_t j1, int dir
 			clamp(j1, (ssize_t)1, m_MapSize)
 		);
 	}
+
+	InitialiseAO();
 }
 
 void CTerrain::MakeDirty(int dirtyFlags)
@@ -684,6 +707,8 @@ void CTerrain::MakeDirty(int dirtyFlags)
 
 	if (m_Heightmap)
 		m_HeightMipmap.Update(m_Heightmap);
+
+	InitialiseAO();
 }
 
 CBoundingBoxAligned CTerrain::GetVertexesBound(ssize_t i0, ssize_t j0, ssize_t i1, ssize_t j1)

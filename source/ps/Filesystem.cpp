@@ -71,20 +71,31 @@ Status ReloadChangedFiles()
 	PROFILE3("hotload");
 
 	std::vector<DirWatchNotification> notifications;
+	debug_printf(L"rcf\n");
 	RETURN_STATUS_IF_ERR(dir_watch_Poll(notifications));
+	debug_printf(L"%d\n", notifications.size());
 	for(size_t i = 0; i < notifications.size(); i++)
 	{
+		debug_printf(L"%ls\n", notifications[i].Pathname().string().c_str());
 		if(!CanIgnore(notifications[i]))
 		{
+			Status ret;
+			debug_printf(L"can't ignore\n");
 			VfsPath pathname;
 			RETURN_STATUS_IF_ERR(g_VFS->GetVirtualPath(notifications[i].Pathname(), pathname));
-			RETURN_STATUS_IF_ERR(g_VFS->RemoveFile(pathname));
+			debug_printf(L"1\n");
+			ret = g_VFS->RemoveFile(pathname);
+			if (ret != ERR::VFS_FILE_NOT_FOUND)
+				RETURN_STATUS_IF_ERR(ret);
+			debug_printf(L"2\n");
 			RETURN_STATUS_IF_ERR(g_VFS->RepopulateDirectory(pathname.Parent()/""));
+			debug_printf(L"3\n");
 
 			// Tell each hotloadable system about this file change:
 
 			for (size_t j = 0; j < g_ReloadFuncs.size(); ++j)
 				g_ReloadFuncs[j].first(g_ReloadFuncs[j].second, pathname);
+			debug_printf(L"5\n");
 
 			RETURN_STATUS_IF_ERR(h_reload(g_VFS, pathname));
 		}

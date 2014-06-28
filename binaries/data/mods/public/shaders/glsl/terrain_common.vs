@@ -17,6 +17,8 @@ uniform mat4 shadowTransform;
   uniform vec4 shadowScale;
 #endif
 
+varying float v_ao;
+
 varying vec3 v_lighting;
 
 #if USE_SHADOW
@@ -53,6 +55,7 @@ attribute vec3 a_normal;
 attribute vec3 a_color;
 attribute vec2 a_uv0;
 attribute vec2 a_uv1;
+attribute float a_ao;
 
 void main()
 {
@@ -65,6 +68,8 @@ void main()
   gl_Position = transform * position;
 
   v_lighting = a_color * sunColor;
+
+  v_ao = a_ao;
   
   #if DECAL
     v_tex.xy = a_uv0;

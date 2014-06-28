@@ -127,7 +127,7 @@ static void inotify_event_loop_process_events()
 		ne.wd = pevent->wd;
 		ne.filename = pevent->name;
 		ne.code = pevent->mask;
-
+debug_printf(L"%hs\n", pevent->name);
  		pthread_mutex_lock(&g_mutex);
  		g_notifications.push_back(ne);
  		pthread_mutex_unlock(&g_mutex);
@@ -236,6 +236,7 @@ Status dir_watch_Poll(DirWatchNotifications& notifications)
 
 	for(size_t i = 0; i < polled_notifications.size(); ++i)
 	{
+		debug_printf(L"poll %d %hs\n", i, polled_notifications[i].filename.c_str());
 		DirWatchNotification::EType type;
 		// TODO: code is actually a bitmask, so this is slightly incorrect
 		switch(polled_notifications[i].code)

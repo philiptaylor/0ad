@@ -28,6 +28,8 @@ uniform vec2 fogParams;
 
 uniform vec2 textureTransform;
 
+varying float v_ao;
+
 varying vec3 v_lighting;
 
 #if USE_SHADOW
@@ -233,7 +235,7 @@ void main()
     specular.rgb = sunColor * specCol * pow(max(0.0, dot(normalize(normal), v_half)), specPow);
   #endif
 
-  vec3 color = (texdiffuse * sundiffuse + specular.rgb) * get_shadow() + texdiffuse * ambient;
+  vec3 color = (texdiffuse * sundiffuse + specular.rgb) * get_shadow() + texdiffuse * ambient * v_ao;
 
   #if USE_SPECULAR_MAP && USE_SELF_LIGHT
     color = mix(texdiffuse, color, specular.a);
@@ -250,6 +252,8 @@ void main()
   #endif
 
   gl_FragColor.rgb = color;
+//gl_FragColor.rgb=vec3(pow(v_ao,2.0));
+//gl_FragColor.rgb=vec3(pow(v_ao,1.0));
 
   #if USE_GRASS
     gl_FragColor.a = tex.a;

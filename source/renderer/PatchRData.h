@@ -79,8 +79,9 @@ private:
 		// diffuse color from sunlight
 		SColor4ub m_DiffuseColor;
 		CVector3D m_Normal;
+		float m_AOFactor;
 	};
-	cassert(sizeof(SBaseVertex) == 28);
+	cassert(sizeof(SBaseVertex) == 32);
 
 	struct SSideVertex {
 		// vertex position
@@ -98,8 +99,9 @@ private:
 		// vertex uvs for alpha texture
 		float m_AlphaUVs[2];
 		CVector3D m_Normal;
+		float m_AOFactor;
 	};
-	cassert(sizeof(SBlendVertex) == 36);
+	cassert(sizeof(SBlendVertex) == 40);
 
 	// Mixed Fancy/Simple water vertex description data structure
 	struct SWaterVertex {
