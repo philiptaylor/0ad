@@ -10,9 +10,13 @@ PARAM shadowTransform[4] = { program.local[3..6] };
 
 TEMP lighting;
 
+OUTPUT v_ao = result.color.secondary;
+
 //// Compute position and normal:
 
 ATTRIB position = vertex.position;
+
+ATTRIB ao = vertex.attrib[1];
 
 DP4 result.position.x, state.matrix.mvp.row[0], position;
 DP4 result.position.y, state.matrix.mvp.row[1], position;
@@ -26,6 +30,9 @@ DP4 result.position.w, state.matrix.mvp.row[3], position;
 MUL lighting, vertex.color, 0.5;
 // Apply light colour
 MUL result.color, lighting, sunColor;
+
+MOV v_ao.x, ao.x;
+//MOV v_ao.x, 1.0;
 
 //// Texture coordinates:
 

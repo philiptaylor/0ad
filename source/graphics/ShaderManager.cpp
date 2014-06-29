@@ -273,7 +273,7 @@ bool CShaderManager::NewProgram(const char* name, const CShaderDefines& baseDefi
 	if (isGLSL)
 		program = CShaderProgramPtr(CShaderProgram::ConstructGLSL(vertexFile, fragmentFile, defines, vertexAttribs, streamFlags));
 	else
-		program = CShaderProgramPtr(CShaderProgram::ConstructARB(vertexFile, fragmentFile, defines, vertexUniforms, fragmentUniforms, streamFlags));
+		program = CShaderProgramPtr(CShaderProgram::ConstructARB(vertexFile, fragmentFile, defines, vertexAttribs, vertexUniforms, fragmentUniforms, streamFlags));
 
 	program->Reload();
 

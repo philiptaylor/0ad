@@ -36,11 +36,13 @@ class CShaderProgramARB : public CShaderProgram
 public:
 	CShaderProgramARB(const VfsPath& vertexFile, const VfsPath& fragmentFile,
 		const CShaderDefines& defines,
+		const std::map<CStrIntern, int>& vertexAttribs,
 		const std::map<CStrIntern, int>& vertexIndexes, const std::map<CStrIntern, frag_index_pair_t>& fragmentIndexes,
 		int streamflags) :
 		CShaderProgram(streamflags),
 		m_VertexFile(vertexFile), m_FragmentFile(fragmentFile),
 		m_Defines(defines),
+		m_VertexAttribs(vertexAttribs),
 		m_VertexIndexes(vertexIndexes), m_FragmentIndexes(fragmentIndexes)
 	{
 		pglGenProgramsARB(1, &m_VertexProgram);
@@ -125,6 +127,10 @@ public:
 		pglBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, m_FragmentProgram);
 
 		BindClientStates();
+
+		for (std::map<CStrIntern, int>::iterator it = m_VertexAttribs.begin(); it != m_VertexAttribs.end(); ++it)
+			pglEnableVertexAttribArrayARB(it->second);
+
 	}
 
 	virtual void Unbind()
@@ -135,6 +141,9 @@ public:
 		pglBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, 0);
 
 		UnbindClientStates();
+
+		for (std::map<CStrIntern, int>::iterator it = m_VertexAttribs.begin(); it != m_VertexAttribs.end(); ++it)
+			pglDisableVertexAttribArrayARB(it->second);
 
 		// TODO: should unbind textures, probably
 	}
@@ -235,6 +244,15 @@ public:
 		Uniform(id, v[0]);
 	}
 
+	virtual void VertexAttribPointer(attrib_id_t id, GLint size, GLenum type, GLboolean normalized, GLsizei stride, void* pointer)
+	{
+		std::map<CStrIntern, int>::iterator it = m_VertexAttribs.find(id);
+		if (it != m_VertexAttribs.end())
+		{
+			pglVertexAttribPointerARB(it->second, size, type, normalized, stride, pointer);
+		}
+	}
+
 private:
 	VfsPath m_VertexFile;
 	VfsPath m_FragmentFile;
@@ -242,6 +260,8 @@ private:
 
 	GLuint m_VertexProgram;
 	GLuint m_FragmentProgram;
+
+	std::map<CStrIntern, int> m_VertexAttribs;
 
 	std::map<CStrIntern, int> m_VertexIndexes;
 	
@@ -670,10 +690,11 @@ CShaderProgram::CShaderProgram(int streamflags)
 #else
 /*static*/ CShaderProgram* CShaderProgram::ConstructARB(const VfsPath& vertexFile, const VfsPath& fragmentFile,
 	const CShaderDefines& defines,
+	const std::map<CStrIntern, int>& vertexAttribs,
 	const std::map<CStrIntern, int>& vertexIndexes, const std::map<CStrIntern, frag_index_pair_t>& fragmentIndexes,
 	int streamflags)
 {
-	return new CShaderProgramARB(vertexFile, fragmentFile, defines, vertexIndexes, fragmentIndexes, streamflags);
+	return new CShaderProgramARB(vertexFile, fragmentFile, defines, vertexAttribs, vertexIndexes, fragmentIndexes, streamflags);
 }
 #endif
 

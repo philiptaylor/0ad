@@ -76,6 +76,7 @@ public:
 	 */
 	static CShaderProgram* ConstructARB(const VfsPath& vertexFile, const VfsPath& fragmentFile,
 		const CShaderDefines& defines,
+		const std::map<CStrIntern, int>& vertexAttribs,
 		const std::map<CStrIntern, int>& vertexIndexes, const std::map<CStrIntern, frag_index_pair_t>& fragmentIndexes,
 		int streamflags);
 

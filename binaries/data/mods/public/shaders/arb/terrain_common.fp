@@ -3,6 +3,8 @@
   OPTION ARB_fragment_program_shadow;
 #endif
 
+#define v_ao fragment.color.secondary
+
 PARAM ambient = program.local[0];
 
 #if DECAL
@@ -64,21 +66,23 @@ TEX color, fragment.texcoord[0], texture[0], 2D;
       TEX temp.w, offset, texture[2], SHADOW2D;
 
       MUL size, size.zxzx, size.wwyy;
-      DP4 temp.x, temp, size;
-      MUL temp.x, temp.x, 0.111111;
+      DP4 temp.w, temp, size;
+      MUL temp.w, temp.w, 0.111111;
     #else
-      TEX temp.x, biasedShdw, texture[2], SHADOW2D;
+      TEX temp.w, biasedShdw, texture[2], SHADOW2D;
     #endif
   #else
     TEX tex, fragment.texcoord[2], texture[2], 2D;
     MOV_SAT temp.z, biasedShdw.z;
-    SGE temp.x, tex.x, temp.z;
+    SGE temp.w, tex.x, temp.z;
   #endif
   MUL diffuse.rgb, fragment.color, 2.0;
-  MAD temp.rgb, diffuse, temp.x, ambient;
+  MUL temp.rgb, ambient, v_ao.x;
+  MAD temp.rgb, diffuse, temp.w, temp;
   MUL color.rgb, color, temp;
 #else
-  MAD temp.rgb, fragment.color, 2.0, ambient;
+  MUL temp.rgb, ambient, v_ao.x;
+  MAD temp.rgb, fragment.color, 2.0, temp.rgb;
   MUL color.rgb, color, temp;
 #endif
 

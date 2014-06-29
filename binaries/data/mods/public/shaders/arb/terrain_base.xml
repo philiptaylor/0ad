@@ -11,6 +11,7 @@
         <stream name="color"/>
         <stream name="uv0"/>
 	<stream name="uv1" if="BLEND"/>
+        <attrib name="a_ao" semantics="CustomAttribute0"/>
     </vertex>
 
     <fragment file="arb/terrain_common.fp">
