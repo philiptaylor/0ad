@@ -389,3 +389,23 @@ void InstancingModelRenderer::RenderModel(const CShaderProgramPtr& shader, int U
 	g_Renderer.m_Stats.m_ModelTris += numFaces;
 
 }
+
+void InstancingModelRenderer::RenderModelInstanced(const CShaderProgramPtr& shader, int UNUSED(streamflags), CModel* model, size_t count)
+{
+	CModelDefPtr mdldef = model->GetModelDef();
+
+	// render the lot
+	size_t numFaces = mdldef->GetNumFaces();
+	if (!g_Renderer.m_SkipSubmit)
+	{
+		// Draw with DrawRangeElements where available, since it might be more efficient
+		pglDrawElementsInstancedARB(GL_TRIANGLES, (GLsizei)numFaces*3, GL_UNSIGNED_SHORT, m->imodeldefIndexBase, count);
+//		pglDrawRangeElementsEXT(GL_TRIANGLES, 0, (GLuint)m->imodeldef->m_Array.GetNumVertices()-1,
+//				(GLsizei)numFaces*3, GL_UNSIGNED_SHORT, m->imodeldefIndexBase);
+	}
+
+	// bump stats
+	g_Renderer.m_Stats.m_DrawCalls++;
+	g_Renderer.m_Stats.m_ModelTris += numFaces * count;
+
+}

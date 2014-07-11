@@ -157,7 +157,7 @@ public:
 	};
 	
 public:
-	VertexArray(GLenum usage, GLenum target = GL_ARRAY_BUFFER);
+	VertexArray(GLenum usage = GL_DYNAMIC_DRAW, GLenum target = GL_ARRAY_BUFFER);
 	~VertexArray();
 	
 	// Set the number of vertices stored in the array

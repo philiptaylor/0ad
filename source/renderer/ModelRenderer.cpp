@@ -216,6 +216,11 @@ struct ShaderModelRendererInternals
 
 	/// List of submitted models for rendering in this frame
 	std::vector<CModel*> submissions[CRenderer::CULL_MAX];
+
+#define NUM_INSTANCING_ARRAYS 256
+	VertexArray instancingArray[NUM_INSTANCING_ARRAYS];
+	VertexArray::Attribute instancingTransform[NUM_INSTANCING_ARRAYS][4];
+	size_t currentInstancingArray;
 };
 
 
@@ -224,6 +229,21 @@ ShaderModelRenderer::ShaderModelRenderer(ModelVertexRendererPtr vertexrenderer)
 {
 	m = new ShaderModelRendererInternals(this);
 	m->vertexRenderer = vertexrenderer;
+
+	for (size_t j = 0; j < NUM_INSTANCING_ARRAYS; ++j)
+	{
+		for (size_t i = 0; i < 4; ++i)
+		{
+			m->instancingTransform[j][i].type = GL_FLOAT;
+			m->instancingTransform[j][i].elems = 4;
+			m->instancingArray[j].AddAttribute(&m->instancingTransform[j][i]);
+		}
+
+		m->instancingArray[j].SetNumVertices(64);
+		m->instancingArray[j].Layout();
+	}
+
+	m->currentInstancingArray = 0;
 }
 
 ShaderModelRenderer::~ShaderModelRenderer()
@@ -619,7 +639,7 @@ void ShaderModelRenderer::Render(const RenderModifierPtr& modifier, const CShade
 		typedef ProxyAllocator<CStrIntern, Allocators::DynamicArena> BindingNamesListAllocator;
 		std::vector<CStrIntern, BindingNamesListAllocator> texBindingNames((BindingNamesListAllocator(arena)));
 		texBindingNames.reserve(64);
-
+//printf("----\n");
 		while (idxTechStart < techBuckets.size())
 		{
 			CShaderTechniquePtr currentTech = techBuckets[idxTechStart].tech;
@@ -656,6 +676,12 @@ void ShaderModelRenderer::Render(const RenderModifierPtr& modifier, const CShade
 
 				for (size_t idx = idxTechStart; idx < idxTechEnd; ++idx)
 				{
+					int instances = 0;
+					VertexArrayIterator<CVector4D> instancingTransform[4];
+					for (size_t i = 0; i < 4; ++i)
+						instancingTransform[i] = m->instancingTransform[m->currentInstancingArray][i].GetIterator<CVector4D>();
+					CModel* lastModel = NULL;
+
 					CModel** models = techBuckets[idx].models;
 					size_t numModels = techBuckets[idx].numModels;
 					for (size_t i = 0; i < numModels; ++i)
@@ -667,6 +693,8 @@ void ShaderModelRenderer::Render(const RenderModifierPtr& modifier, const CShade
 
 						const CMaterial::SamplersVector& samplers = model->GetMaterial().GetSamplers();
 						size_t samplersNum = samplers.size();
+
+						bool changed = false;
 						
 						// make sure the vectors are the right virtual sizes, and also
 						// reallocate if there are more samplers than expected.
@@ -705,6 +733,21 @@ void ShaderModelRenderer::Render(const RenderModifierPtr& modifier, const CShade
 							CTexture* newTex = samp.Sampler.get();
 							if (bind.Active() && newTex != currentTexs[s])
 							{
+								if (instances)
+								{
+									m->instancingArray[m->currentInstancingArray].Upload();
+									u8* base = m->instancingArray[m->currentInstancingArray].Bind();
+									shader->VertexAttribPointer(str_a_instancingTransform0, 4, GL_FLOAT, GL_TRUE, m->instancingArray[m->currentInstancingArray].GetStride(), base + m->instancingTransform[m->currentInstancingArray][0].offset);
+									shader->VertexAttribPointer(str_a_instancingTransform1, 4, GL_FLOAT, GL_TRUE, m->instancingArray[m->currentInstancingArray].GetStride(), base + m->instancingTransform[m->currentInstancingArray][1].offset);
+									shader->VertexAttribPointer(str_a_instancingTransform2, 4, GL_FLOAT, GL_TRUE, m->instancingArray[m->currentInstancingArray].GetStride(), base + m->instancingTransform[m->currentInstancingArray][2].offset);
+									shader->VertexAttribPointer(str_a_instancingTransform3, 4, GL_FLOAT, GL_TRUE, m->instancingArray[m->currentInstancingArray].GetStride(), base + m->instancingTransform[m->currentInstancingArray][3].offset);
+									m->vertexRenderer->RenderModelInstanced(shader, streamflags, lastModel, instances);
+									instances = 0;
+									m->currentInstancingArray = (m->currentInstancingArray + 1) % NUM_INSTANCING_ARRAYS;
+									for (size_t i = 0; i < 4; ++i)
+										instancingTransform[i] = m->instancingTransform[m->currentInstancingArray][i].GetIterator<CVector4D>();
+								}
+
 								shader->BindTexture(bind, samp.Sampler->GetHandle());
 								currentTexs[s] = newTex;
 							}
@@ -714,6 +757,22 @@ void ShaderModelRenderer::Render(const RenderModifierPtr& modifier, const CShade
 						CModelDef* newModeldef = model->GetModelDef().get();
 						if (newModeldef != currentModeldef)
 						{
+							if (instances)
+							{
+								m->instancingArray[m->currentInstancingArray].Upload();
+								u8* base = m->instancingArray[m->currentInstancingArray].Bind();
+								shader->VertexAttribPointer(str_a_instancingTransform0, 4, GL_FLOAT, GL_TRUE, m->instancingArray[m->currentInstancingArray].GetStride(), base + m->instancingTransform[m->currentInstancingArray][0].offset);
+								shader->VertexAttribPointer(str_a_instancingTransform1, 4, GL_FLOAT, GL_TRUE, m->instancingArray[m->currentInstancingArray].GetStride(), base + m->instancingTransform[m->currentInstancingArray][1].offset);
+								shader->VertexAttribPointer(str_a_instancingTransform2, 4, GL_FLOAT, GL_TRUE, m->instancingArray[m->currentInstancingArray].GetStride(), base + m->instancingTransform[m->currentInstancingArray][2].offset);
+								shader->VertexAttribPointer(str_a_instancingTransform3, 4, GL_FLOAT, GL_TRUE, m->instancingArray[m->currentInstancingArray].GetStride(), base + m->instancingTransform[m->currentInstancingArray][3].offset);
+								m->vertexRenderer->RenderModelInstanced(shader, streamflags, lastModel, instances);
+								m->currentInstancingArray = (m->currentInstancingArray + 1) % NUM_INSTANCING_ARRAYS;
+								instances = 0;
+								for (size_t i = 0; i < 4; ++i)
+									instancingTransform[i] = m->instancingTransform[m->currentInstancingArray][i].GetIterator<CVector4D>();
+							}
+
+
 							currentModeldef = newModeldef;
 							m->vertexRenderer->PrepareModelDef(shader, streamflags, *currentModeldef);
 						}
@@ -758,12 +817,68 @@ void ShaderModelRenderer::Render(const RenderModifierPtr& modifier, const CShade
 							}
 						}
 
-						modifier->PrepareModel(shader, model);
+//						if (changed && instances)
+//						{
+//							printf("%d\n", instances);
+//							instances = 0;
+//						}
 
-						CModelRData* rdata = static_cast<CModelRData*>(model->GetRenderData());
-						ENSURE(rdata->GetKey() == m->vertexRenderer.get());
+//						modifier->PrepareModel(shader, model);
 
-						m->vertexRenderer->RenderModel(shader, streamflags, model, rdata);
+//						CModelRData* rdata = static_cast<CModelRData*>(model->GetRenderData());
+//						ENSURE(rdata->GetKey() == m->vertexRenderer.get());
+
+//						m->vertexRenderer->RenderModel(shader, streamflags, model, rdata);
+
+						CMatrix3D transform = model->GetTransform();
+//						for(int j=0;j<1024;++j){
+						*instancingTransform[0]++ = CVector4D(transform._11, transform._21, transform._31, transform._41);
+						*instancingTransform[1]++ = CVector4D(transform._12, transform._22, transform._32, transform._42);
+						*instancingTransform[2]++ = CVector4D(transform._13, transform._23, transform._33, transform._43);
+						*instancingTransform[3]++ = CVector4D(transform._14, transform._24, transform._34, transform._44);
+//					}
+						++instances;
+						lastModel = model;
+
+						if (instances >= m->instancingArray[m->currentInstancingArray].GetNumVertices())
+						{
+							m->instancingArray[m->currentInstancingArray].Upload();
+							u8* base = m->instancingArray[m->currentInstancingArray].Bind();
+							shader->VertexAttribPointer(str_a_instancingTransform0, 4, GL_FLOAT, GL_TRUE, m->instancingArray[m->currentInstancingArray].GetStride(), base + m->instancingTransform[m->currentInstancingArray][0].offset);
+							shader->VertexAttribPointer(str_a_instancingTransform1, 4, GL_FLOAT, GL_TRUE, m->instancingArray[m->currentInstancingArray].GetStride(), base + m->instancingTransform[m->currentInstancingArray][1].offset);
+							shader->VertexAttribPointer(str_a_instancingTransform2, 4, GL_FLOAT, GL_TRUE, m->instancingArray[m->currentInstancingArray].GetStride(), base + m->instancingTransform[m->currentInstancingArray][2].offset);
+							shader->VertexAttribPointer(str_a_instancingTransform3, 4, GL_FLOAT, GL_TRUE, m->instancingArray[m->currentInstancingArray].GetStride(), base + m->instancingTransform[m->currentInstancingArray][3].offset);
+							m->vertexRenderer->RenderModelInstanced(shader, streamflags, lastModel, instances);
+							m->currentInstancingArray = (m->currentInstancingArray + 1) % NUM_INSTANCING_ARRAYS;
+							instances = 0;
+							for (size_t i = 0; i < 4; ++i)
+								instancingTransform[i] = m->instancingTransform[m->currentInstancingArray][i].GetIterator<CVector4D>();
+						}
+
+
+//						m->instancingArray.Upload();
+//						u8* base = m->instancingArray.Bind();
+//						shader->VertexAttribPointer(str_a_instancingTransform0, 4, GL_FLOAT, GL_TRUE, m->instancingArray.GetStride(), base + m->instancingTransform[0].offset);
+//						shader->VertexAttribPointer(str_a_instancingTransform1, 4, GL_FLOAT, GL_TRUE, m->instancingArray.GetStride(), base + m->instancingTransform[1].offset);
+//						shader->VertexAttribPointer(str_a_instancingTransform2, 4, GL_FLOAT, GL_TRUE, m->instancingArray.GetStride(), base + m->instancingTransform[2].offset);
+//						shader->VertexAttribPointer(str_a_instancingTransform3, 4, GL_FLOAT, GL_TRUE, m->instancingArray.GetStride(), base + m->instancingTransform[3].offset);
+//						m->vertexRenderer->RenderModelInstanced(shader, streamflags, lastModel, instances);
+//						instances = 0;
+//						for (size_t i = 0; i < 4; ++i)
+//							instancingTransform[i] = m->instancingTransform[i].GetIterator<CVector4D>();
+
+					}
+					if (instances)
+					{
+//						printf("%d\n", instances);
+//						instances = 0;
+						m->instancingArray[m->currentInstancingArray].Upload();
+						u8* base = m->instancingArray[m->currentInstancingArray].Bind();
+						shader->VertexAttribPointer(str_a_instancingTransform0, 4, GL_FLOAT, GL_TRUE, m->instancingArray[m->currentInstancingArray].GetStride(), base + m->instancingTransform[m->currentInstancingArray][0].offset);
+						shader->VertexAttribPointer(str_a_instancingTransform1, 4, GL_FLOAT, GL_TRUE, m->instancingArray[m->currentInstancingArray].GetStride(), base + m->instancingTransform[m->currentInstancingArray][1].offset);
+						shader->VertexAttribPointer(str_a_instancingTransform2, 4, GL_FLOAT, GL_TRUE, m->instancingArray[m->currentInstancingArray].GetStride(), base + m->instancingTransform[m->currentInstancingArray][2].offset);
+						shader->VertexAttribPointer(str_a_instancingTransform3, 4, GL_FLOAT, GL_TRUE, m->instancingArray[m->currentInstancingArray].GetStride(), base + m->instancingTransform[m->currentInstancingArray][3].offset);
+						m->vertexRenderer->RenderModelInstanced(shader, streamflags, lastModel, instances);
 					}
 				}
 

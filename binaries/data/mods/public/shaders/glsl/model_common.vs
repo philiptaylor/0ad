@@ -56,6 +56,11 @@ attribute vec3 a_normal;
 attribute vec2 a_uv0;
 attribute vec2 a_uv1;
 
+attribute vec4 a_instancingTransform0;
+attribute vec4 a_instancingTransform1;
+attribute vec4 a_instancingTransform2;
+attribute vec4 a_instancingTransform3;
+
 #if USE_GPU_SKINNING
   const int MAX_INFLUENCES = 4;
   const int MAX_BONES = 64;
@@ -74,6 +79,8 @@ vec4 fakeCos(vec4 x)
 
 void main()
 {
+  mat4 instancingTransform = mat4(a_instancingTransform0, a_instancingTransform1, a_instancingTransform2, a_instancingTransform3);
+
   #if USE_GPU_SKINNING
     vec3 p = vec3(0.0);
     vec3 n = vec3(0.0);

@@ -377,6 +377,13 @@ FUNC(void, glEndPerfQueryINTEL, (GLuint id))
 FUNC(void, glDeletePerfQueryINTEL, (GLuint id))
 FUNC(void, glGetPerfQueryDataINTEL, (GLuint id, GLenum requestType, GLuint maxLength, char *buffer, GLuint *length))
 
+// GL_ARB_draw_instanced
+FUNC(void, glDrawArraysInstancedARB, (GLenum mode, GLint first, GLsizei count, GLsizei primcount))
+FUNC(void, glDrawElementsInstancedARB, (GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei primcount))
+
+// GL_ARB_instanced_arrays
+FUNC(void, glVertexAttribDivisorARB, (GLuint index, GLuint divisor))
+
 #endif	// #if CONFIG_GLES2
 
 

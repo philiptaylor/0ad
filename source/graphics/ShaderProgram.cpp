@@ -484,7 +484,18 @@ public:
 		pglUseProgramObjectARB(m_Program);
 
 		for (std::map<CStrIntern, int>::iterator it = m_VertexAttribs.begin(); it != m_VertexAttribs.end(); ++it)
+		{
 			pglEnableVertexAttribArrayARB(it->second);
+
+			if (it->first == str_a_instancingTransform0
+					|| it->first == str_a_instancingTransform1
+					|| it->first == str_a_instancingTransform2
+					|| it->first == str_a_instancingTransform3
+			)
+			{
+				pglVertexAttribDivisorARB(it->second, 1);
+			}
+		}
 	}
 
 	virtual void Unbind()
@@ -492,7 +503,10 @@ public:
 		pglUseProgramObjectARB(0);
 
 		for (std::map<CStrIntern, int>::iterator it = m_VertexAttribs.begin(); it != m_VertexAttribs.end(); ++it)
+		{
 			pglDisableVertexAttribArrayARB(it->second);
+			pglVertexAttribDivisorARB(it->second, 0);
+		}
 
 		// TODO: should unbind textures, probably
 	}

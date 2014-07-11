@@ -13,6 +13,11 @@
         <attrib name="a_skinJoints" semantics="CustomAttribute0" if="USE_GPU_SKINNING"/>
         <attrib name="a_skinWeights" semantics="CustomAttribute1" if="USE_GPU_SKINNING"/>
 	<attrib name="a_tangent" semantics="CustomAttribute2" if="USE_INSTANCING || USE_GPU_SKINNING"/>
+
+        <attrib name="a_instancingTransform0" semantics="gl_MultiTexCoord4"/>
+        <attrib name="a_instancingTransform1" semantics="gl_MultiTexCoord5"/>
+        <attrib name="a_instancingTransform2" semantics="gl_MultiTexCoord6"/>
+        <attrib name="a_instancingTransform3" semantics="gl_MultiTexCoord7"/>
     </vertex>
 
     <fragment file="glsl/model_common.fs"/>
