@@ -1,4 +1,5 @@
 #version 120
+#extension GL_EXT_draw_instanced : enable
 
 uniform mat4 transform;
 uniform vec3 cameraPos;
@@ -11,7 +12,7 @@ uniform vec3 sunColor;
 #endif
 uniform vec2 losTransform;
 uniform mat4 shadowTransform;
-uniform mat4 instancingTransform;
+uniform mat4 instancingTransforms[32];
 
 #if USE_SHADOW_SAMPLER && USE_SHADOW_PCF
   uniform vec4 shadowScale;
@@ -56,11 +57,6 @@ attribute vec3 a_normal;
 attribute vec2 a_uv0;
 attribute vec2 a_uv1;
 
-attribute vec4 a_instancingTransform0;
-attribute vec4 a_instancingTransform1;
-attribute vec4 a_instancingTransform2;
-attribute vec4 a_instancingTransform3;
-
 #if USE_GPU_SKINNING
   const int MAX_INFLUENCES = 4;
   const int MAX_BONES = 64;
@@ -79,7 +75,7 @@ vec4 fakeCos(vec4 x)
 
 void main()
 {
-  mat4 instancingTransform = mat4(a_instancingTransform0, a_instancingTransform1, a_instancingTransform2, a_instancingTransform3);
+  mat4 instancingTransform = instancingTransforms[gl_InstanceID];//mat4(a_instancingTransform0, a_instancingTransform1, a_instancingTransform2, a_instancingTransform3);
 
   #if USE_GPU_SKINNING
     vec3 p = vec3(0.0);
